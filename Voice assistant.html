@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KuyomieAI</title>
+</head>
+<body>
+    <h1>AI Assistant</h1>
+    
+    <div>
+        <h2>Press to Listen</h2>
+        <button id="startButton">Start Listening</button>
+        <p id="transcription"></p>
+        <p id='interim_span'></p>
+        <p id="final_span"></p>
+    </div>
+    
+    <div>
+        <h2>Chat on Keyboard</h2>
+        <input type="text" id="userInput" placeholder="Type your message...">
+        <button id="sendMessageButton">Send</button>
+        <div id="chat"></div>
+    </div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const userInput = document.getElementById('userInput');
+        const sendMessageButton = document.getElementById('sendMessageButton');
+        const chat = document.getElementById('chat');
+
+        // Web Speech API for speech-to-text
+        const recognition = new webkitSpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true; // Set this to true to capture interim results
+
+        let finalTimeout;
+
+        recognition.onresult = (event) => {
+            let interim_transcript = '';
+            let final_transcript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    final_transcript += event.results[i][0].transcript;
+                } else {
+                    interim_transcript += event.results[i][0].transcript;
+                }
+            }
+
+            // Display interim and final results
+            interim_transcript = capitalize(interim_transcript);
+            final_transcript = capitalize(final_transcript);
+
+            // Display interim results as you speak
+            interim_span.innerHTML = linebreak(interim_transcript);
+
+            // Clear any previous timeout
+            clearTimeout(finalTimeout);
+
+            // Set a timeout to update the final results after 5 seconds of pause
+            finalTimeout = setTimeout(() => {
+                final_span.innerHTML = linebreak(final_transcript);
+            }, 5000); // 5000 milliseconds (5 seconds)
+        };
+
+        startButton.addEventListener('click', () => {
+            // Clear previous recognition
+            interim_span.innerHTML = '';
+            final_span.innerHTML = '';
+            recognition.lang = 'zh-CN';
+            recognition.start();
+        });
+
+
+        // OpenAI GPT-3
+        const openaiApiKey = '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';
+
+        //chat function
+        sendMessageButton.addEventListener('click', () => {
+            const userMessage = userInput.value;
+            displayUserMessage(userMessage);
+            userInput.value = '';
+
+            // Send userMessage to OpenAI and receive a response
+            fetch('https://api.openai.com/v1/engines/davinci/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${openaiApiKey}`
+                },
+                body: JSON.stringify({
+                    prompt: userMessage,
+                    max_tokens: 50
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const assistantMessage = data.choices[0].text;
+                displayAssistantMessage(assistantMessage);
+            })
+            .catch(error => console.error(error));
+        });
+
+        function displayUserMessage(message) {
+            const userMessageElement = document.createElement('p');
+            userMessageElement.textContent = `You: ${message}`;
+            chat.appendChild(userMessageElement);
+        }
+
+        function displayAssistantMessage(message) {
+            const assistantMessageElement = document.createElement('p');
+            assistantMessageElement.textContent = `Assistant: ${message}`;
+            chat.appendChild(assistantMessageElement);
+        }
+    </script>
+</body>
+</html>
